@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel
 
-load_dotenv()
+load_dotenv(override=True)
 client = OpenAI(base_url=os.getenv("LLM_BASE_URL"), api_key=os.getenv("LLM_API_KEY"))
 MODEL = os.getenv("LLM_MODEL")
 
@@ -41,6 +41,21 @@ Rules:
 - language: 'bangla' if Bangla script is used, 'banglish' if Bangla words in English alphabet, 'english' if English.
 - summary: one short English sentence (include note if sender is a minor/school student or requested a specific callback time).
 Never invent information. Use "" when string is unknown."""
+
+def generate_summary(stats: str) -> str:
+    system = """You are a helpful AI assistant for BIAI. 
+    Convert the provided CRM pipeline statistics into a brief, natural-sounding executive summary. The summary must be no more than 5 sentences.
+    Keep it professional and highlight any urgent or overdue items."""
+    
+    r = client.chat.completions.create(
+        model=MODEL, 
+        temperature=0.3,
+        messages=[
+            {"role": "system", "content": system}, 
+            {"role": "user", "content": stats}
+        ],
+    )
+    return r.choices[0].message.content.strip()
 
 def has_bangla_script(text: str) -> bool:
     return bool(re.search(r"[\u0980-\u09FF]", text))
@@ -108,12 +123,17 @@ Grounding Rules:
 - If category is 'not_a_lead' (e.g. job applicant), politely direct them to email support@biai.com.bd.
 Output ONLY the reply text.
 
+
+
 FACTS:
 {_facts()}"""
     user = f"Sender: {name}\nInterest: {interest}\nCategory: {category}\nMessage: {message}"
     r = client.chat.completions.create(
         model=MODEL, temperature=0.3,
-        messages=[{"role": "user", "content": system + "\n\n" + user}],
+        messages=[
+        {"role": "system", "content": system},
+        {"role": "user", "content": user}
+        ],
         max_tokens=1500,
     )
     return r.choices[0].message.content.strip()

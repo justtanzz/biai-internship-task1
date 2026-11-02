@@ -2,19 +2,21 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlmodel import Session, select
+from sqlmodel import Session, select, SQLModel
+from contextlib import asynccontextmanager
 from app.models import Enquiry, get_session, init_db
-from app.ai import extract, suggest_reply
+from app.ai import extract, suggest_reply, generate_summary 
 from datetime import datetime, timezone, timedelta
 
-app = FastAPI(title="BIAI CRM")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
 
+app = FastAPI(lifespan=lifespan)
 # Mount the static folder to serve our UI
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-@app.on_event("startup")
-def startup():
-    init_db()
 
 @app.get("/")
 def serve_index():
@@ -83,3 +85,16 @@ def get_overdue(s: Session = Depends(get_session)):
         )
     ).all()
     return overdue
+
+@app.get("/reports/summary")
+def get_weekly_summary(s: Session = Depends(get_session)):
+    enquiries = s.exec(select(Enquiry)).all()
+    total = len(enquiries)
+    new = sum(1 for e in enquiries if e.status == "New" and e.category == "lead")
+    support = sum(1 for e in enquiries if e.category == "support")
+    urgent = sum(1 for e in enquiries if e.urgent)
+    paid = sum(1 for e in enquiries if e.status == "Paid")
+    
+    stats = f"Total Enquiries: {total}. New Leads: {new}. Support Tickets: {support}. Urgent Items: {urgent}. Paid: {paid}."
+    summary_text = generate_summary(stats)
+    return {"summary": summary_text}

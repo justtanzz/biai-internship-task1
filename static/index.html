@@ -32,9 +32,12 @@
 <body>
     <div class="container">
         <div class="header">
-            <h2>BIAI CRM</h2>
+        <h2>BIAI CRM</h2>
+        <div>
+            <button onclick="openReports()" style="background: #61bd4f; margin-right: 10px;">Weekly Report</button>
             <button onclick="document.getElementById('newModal').style.display='block'">+ New Enquiry</button>
         </div>
+    </div>
         
         <div class="kanban" id="board">
             <div class="column" id="col-New"><h3>New</h3><div class="cards"></div></div>
@@ -86,6 +89,22 @@
             </div>
             <br>
             <button onclick="document.getElementById('viewModal').style.display='none'" style="background: #ccc; color: black;">Close</button>
+        </div>
+    </div>
+
+    <!-- Reports Modal -->
+    <div class="modal" id="reportsModal">
+        <div class="modal-content">
+            <h3>Weekly Summary & Overdue Leads</h3>
+            
+            <h4>AI Summary</h4>
+            <div id="aiSummary" class="reply-box">Loading...</div>
+            
+            <h4>Overdue (> 48 hours)</h4>
+            <ul id="overdueList" style="font-size: 14px;">Loading...</ul>
+            
+            <br>
+            <button onclick="document.getElementById('reportsModal').style.display='none'" style="background: #ccc; color: black;">Close</button>
         </div>
     </div>
 
@@ -269,6 +288,45 @@
                 }
             }
         }
+
+        async function openReports() {
+        document.getElementById('reportsModal').style.display = 'block';
+        document.getElementById('aiSummary').innerText = "Generating AI summary (takes 10-30s)...";
+        document.getElementById('overdueList').innerHTML = "Loading...";
+
+        // 1. Fetch Overdue Leads (Independent block)
+        try {
+            const resOverdue = await fetch('/reports/overdue', { cache: 'no-store' });
+            if (!resOverdue.ok) throw new Error("Failed to load overdue leads.");
+            const overdueData = await resOverdue.json();
+            
+            const list = document.getElementById('overdueList');
+            list.innerHTML = '';
+            if (overdueData.length === 0) {
+                list.innerHTML = '<li>No overdue leads.</li>';
+            } else {
+                overdueData.forEach(e => {
+                    list.innerHTML += `<li><strong>${e.name}</strong> - ${e.status} (Needs follow-up)</li>`;
+                });
+            }
+        } catch (err) {
+            document.getElementById('overdueList').innerHTML = `<li>Error: ${err.message}</li>`;
+        }
+
+        // 2. Fetch AI Summary (Independent block)
+        try {
+            const resSum = await fetch('/reports/summary', { cache: 'no-store' });
+            if (!resSum.ok) {
+                const errText = await resSum.text();
+                throw new Error(`Server returned ${resSum.status}`);
+            }
+            const sumData = await resSum.json();
+            document.getElementById('aiSummary').innerText = sumData.summary;
+        } catch (err) {
+            console.error(err);
+            document.getElementById('aiSummary').innerText = "Error generating summary: " + err.message;
+        }
+}
 
         loadBoard();
     </script>
