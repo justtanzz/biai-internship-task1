@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BIAI CRM</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f4f5f7; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .kanban { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px; }
+        .column { flex: 1; min-width: 280px; background: #eef2f5; border-radius: 8px; padding: 10px; }
+        .column h3 { margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; color: #5e6c84; }
+        .card { background: white; padding: 12px; margin-bottom: 10px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; border-left: 4px solid #0079bf; }
+        .card.urgent { border-left-color: #eb5a46; }
+        .card.support { border-left-color: #f2d600; }
+        .card.spam { border-left-color: #42526e; opacity: 0.7; }
+        .badges { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
+        .badge { font-size: 10px; padding: 2px 6px; border-radius: 12px; background: #dfe1e6; color: #172b4d; font-weight: bold; }
+        .badge.urgent { background: #ffeceb; color: #bf2600; }
+        
+        /* Modal */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); padding: 50px; }
+        .modal-content { background: white; max-width: 600px; margin: auto; padding: 20px; border-radius: 8px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { background: #0079bf; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #026aa7; }
+        .reply-box { background: #f4f5f7; padding: 10px; border-radius: 4px; font-size: 13px; margin-top: 10px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>BIAI CRM</h2>
+            <button onclick="document.getElementById('newModal').style.display='block'">+ New Enquiry</button>
+        </div>
+        
+        <div class="kanban" id="board">
+            <div class="column" id="col-New"><h3>New</h3><div class="cards"></div></div>
+            <div class="column" id="col-Contacted"><h3>Contacted</h3><div class="cards"></div></div>
+            <div class="column" id="col-Interested"><h3>Interested</h3><div class="cards"></div></div>
+            <div class="column" id="col-Paid"><h3>Paid</h3><div class="cards"></div></div>
+            <div class="column" id="col-Lost"><h3>Lost</h3><div class="cards"></div></div>
+        </div>
+    </div>
+
+    <!-- New Enquiry Modal -->
+    <div class="modal" id="newModal">
+        <div class="modal-content">
+            <h3>Extract from Message</h3>
+            <div class="form-group">
+                <textarea id="rawMessage" rows="4" placeholder="Paste WhatsApp/Facebook message here..."></textarea>
+            </div>
+            <button onclick="extractData(this)">Autofill with AI</button>
+            
+            <hr style="margin: 20px 0;">
+            
+            <form id="enquiryForm" onsubmit="saveEnquiry(event)">
+                <div class="form-group"><label>Name</label><input type="text" id="fName" required></div>
+                <div class="form-group"><label>Phone</label><input type="text" id="fPhone"></div>
+                <div class="form-group"><label>Interest</label><select id="fInterest"><option value="bootcamp">Bootcamp</option><option value="fellowship">Fellowship</option><option value="corporate">Corporate</option><option value="other">Other</option><option value="unclear">Unclear</option></select></div>
+                <div class="form-group"><label>Message</label><textarea id="fMsg" required></textarea></div>
+                <button type="submit">Save to CRM</button>
+                <button type="button" onclick="document.getElementById('newModal').style.display='none'" style="background: #ccc; color: black;">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Modal -->
+    <div class="modal" id="viewModal">
+        <div class="modal-content">
+            <h3 id="vName">Name</h3>
+            <p id="vPhone"></p>
+            <p><strong>Message:</strong> <span id="vMsg"></span></p>
+            <p><strong>Status:</strong> 
+                <select id="vStatus" onchange="updateStatus()">
+                    <option value="New">New</option><option value="Contacted">Contacted</option>
+                    <option value="Interested">Interested</option><option value="Paid">Paid</option>
+                    <option value="Lost">Lost</option>
+                </select>
+            </p>
+            <div>
+                <button id="btnGenerate" onclick="generateReply()">Generate AI Reply</button>
+                <div id="vReply" class="reply-box" style="display:none;"></div>
+            </div>
+            <br>
+            <button onclick="document.getElementById('viewModal').style.display='none'" style="background: #ccc; color: black;">Close</button>
+        </div>
+    </div>
+
+    <script>
+        let currentId = null;
+        const activeGenerations = new Set();
+        async function loadBoard() {
+            // Fix 1: Force the browser to bypass the cache on GET requests
+            const res = await fetch('/enquiries', { cache: 'no-store' });
+            const data = await res.json();
+            
+            document.querySelectorAll('.cards').forEach(c => c.innerHTML = '');
+            
+            data.forEach(e => {
+                const col = document.querySelector(`#col-${e.status} .cards`);
+                if (!col) return;
+                
+                let html = `<div class="card ${e.urgent ? 'urgent' : ''} ${e.category}" onclick="openView(${e.id}, ${e.duplicate_of})">`;
+                html += `<div class="badges">`;
+                if (e.urgent) html += `<span class="badge urgent">URGENT</span>`;
+                if (e.category !== 'lead') html += `<span class="badge">${e.category.toUpperCase()}</span>`;
+                if (e.duplicate_of) html += `<span class="badge">DUP #${e.duplicate_of}</span>`;
+                html += `</div>`;
+                html += `<strong>${e.name}</strong> ${e.company ? `(${e.company})` : ''}<br>`;
+                html += `<small style="color: #666;">${e.interest} • ${e.language}</small><br>`;
+                html += `<small>${e.summary}</small>`;
+                html += `</div>`;
+                
+                col.innerHTML += html;
+            });
+        }
+
+        async function extractData(btn) {
+            const msg = document.getElementById('rawMessage').value;
+            
+            // Fix 3: Stop empty requests before they hit the GPU
+            if (!msg.trim()) {
+                alert("Please paste a message first.");
+                return;
+            }
+            
+            // Add a friendly loading state for extraction
+            const originalText = btn.innerText;
+            btn.innerText = "Extracting...";
+            btn.disabled = true;
+
+            try {
+                document.getElementById('fMsg').value = msg;
+                const res = await fetch('/extract', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: msg, channel: 'Manual' })
+                });
+                const data = await res.json();
+                
+                document.getElementById('fName').value = data.name || '';
+                document.getElementById('fPhone').value = data.phone || '';
+                document.getElementById('fInterest').value = data.interest || 'unclear';
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function saveEnquiry(e) {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('fName').value,
+                phone: document.getElementById('fPhone').value,
+                interest: document.getElementById('fInterest').value,
+                message: document.getElementById('fMsg').value,
+                channel: "Manual"
+            };
+            await fetch('/enquiries', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            document.getElementById('newModal').style.display = 'none';
+            document.getElementById('enquiryForm').reset();
+            loadBoard();
+        }
+
+        async function openView(id) {
+            currentId = id;
+            const res = await fetch('/enquiries', { cache: 'no-store' });
+            const data = await res.json();
+            const e = data.find(x => x.id === id);
+            
+            document.getElementById('vName').innerText = e.name;
+            document.getElementById('vPhone').innerText = e.phone || 'No phone';
+            document.getElementById('vMsg').innerText = e.message;
+            document.getElementById('vStatus').value = e.status;
+            
+            const replyBox = document.getElementById('vReply');
+            const genBtn = document.getElementById('btnGenerate');
+            
+            // UI State Manager
+            if (activeGenerations.has(id)) {
+                // Restore loading state if running in background
+                replyBox.style.display = 'block';
+                replyBox.style.color = "#666";
+                replyBox.innerText = "Waiting for local LLM to finish...";
+                genBtn.innerText = "Generating (takes 10-30s)...";
+                genBtn.disabled = true;
+            } else if (e.suggested_reply) {
+                // Show completed reply
+                replyBox.style.display = 'block';
+                replyBox.style.color = "black";
+                replyBox.innerText = e.suggested_reply;
+                genBtn.innerText = "Generate AI Reply";
+                genBtn.disabled = false;
+            } else {
+                // Clean slate
+                replyBox.style.display = 'none';
+                replyBox.innerText = "";
+                genBtn.innerText = "Generate AI Reply";
+                genBtn.disabled = false;
+            }
+            
+            document.getElementById('viewModal').style.display = 'block';
+        }
+
+        async function updateStatus() {
+            const status = document.getElementById('vStatus').value;
+            await fetch(`/enquiries/${currentId}/status`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ status })
+            });
+            loadBoard();
+        }
+
+        async function generateReply() {
+            const requestTargetId = currentId;
+            
+            // Prevent duplicate clicks firing multiple backend tasks
+            if (activeGenerations.has(requestTargetId)) return;
+            
+            activeGenerations.add(requestTargetId);
+            
+            const btn = document.getElementById('btnGenerate');
+            const box = document.getElementById('vReply');
+            
+            if (currentId === requestTargetId) {
+                btn.innerText = "Generating (takes 10-30s)...";
+                btn.disabled = true;
+                box.style.display = 'block';
+                box.style.color = "#666";
+                box.innerText = "Waiting for local LLM to finish...";
+            }
+
+            try {
+                const res = await fetch(`/enquiries/${requestTargetId}/reply`, { method: 'POST' });
+                
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(`HTTP ${res.status}: ${errText}`);
+                }
+                
+                const data = await res.json();
+                
+                // Ensure box becomes visible even if reopened during wait
+                if (currentId === requestTargetId) {
+                    box.style.display = 'block';
+                    box.style.color = "black";
+                    box.innerText = data.reply || "LLM returned an empty response.";
+                }
+            } catch (err) {
+                console.error(err);
+                if (currentId === requestTargetId) {
+                    box.style.display = 'block';
+                    box.style.color = "#d32f2f";
+                    box.innerText = "Error: " + err.message;
+                }
+            } finally {
+                activeGenerations.delete(requestTargetId);
+                if (currentId === requestTargetId) {
+                    btn.innerText = "Generate AI Reply";
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        loadBoard();
+    </script>
+</body>
+</html>
