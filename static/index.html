@@ -72,7 +72,7 @@
         </div>
     </div>
 
-    <!-- View Modal -->
+   <!-- View Modal -->
     <div class="modal" id="viewModal">
         <div class="modal-content">
             <h3 id="vName">Name</h3>
@@ -80,9 +80,12 @@
             <p><strong>Message:</strong> <span id="vMsg"></span></p>
             <p><strong>Status:</strong> 
                 <select id="vStatus" onchange="updateStatus()">
-                    <option value="New">New</option><option value="Contacted">Contacted</option>
-                    <option value="Interested">Interested</option><option value="Paid">Paid</option>
+                    <option value="New">New</option>
+                    <option value="Contacted">Contacted</option>
+                    <option value="Interested">Interested</option>
+                    <option value="Paid">Paid</option>
                     <option value="Lost">Lost</option>
+                    <option value="Duplicate">Duplicate</option>
                 </select>
             </p>
             <div>
@@ -90,7 +93,10 @@
                 <div id="vReply" class="reply-box" style="display:none;"></div>
             </div>
             <br>
-            <button onclick="document.getElementById('viewModal').style.display='none'" style="background: #ccc; color: black;">Close</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                <button onclick="document.getElementById('viewModal').style.display='none'" style="background: #ccc; color: black;">Close</button>
+                <button type="button" onclick="deleteCurrentEnquiry()" style="background: #eb5a46; color: white;">Delete</button>
+            </div>
         </div>
     </div>
 
@@ -238,6 +244,19 @@
                 body: JSON.stringify({ status })
             });
             loadBoard();
+        }
+
+        async function deleteCurrentEnquiry() {
+            if (!currentId) return;
+            if (!confirm("Are you sure you want to delete this enquiry?")) return;
+            
+            const res = await fetch(`/enquiries/${currentId}`, { method: 'DELETE' });
+            if (res.ok) {
+                document.getElementById('viewModal').style.display = 'none';
+                loadBoard();
+            } else {
+                alert("Failed to delete enquiry.");
+            }
         }
 
         async function generateReply() {

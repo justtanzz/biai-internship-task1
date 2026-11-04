@@ -108,3 +108,12 @@ def get_weekly_summary(s: Session = Depends(get_session)):
     stats = f"Total Enquiries: {total}. New Leads: {new}. Support Tickets: {support}. Urgent Items: {urgent}. Paid: {paid}."
     summary_text = generate_summary(stats)
     return {"summary": summary_text}
+
+@app.delete("/enquiries/{eid}")
+def delete_enquiry(eid: int, s: Session = Depends(get_session)):
+    e = s.get(Enquiry, eid)
+    if not e:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    s.delete(e)
+    s.commit()
+    return {"status": "deleted"}
