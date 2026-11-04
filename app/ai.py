@@ -107,8 +107,10 @@ def _facts() -> str:
     return open(p, encoding="utf-8").read() if os.path.exists(p) else ""
 
 def suggest_reply(message: str, language: str, name: str, interest: str, category: str) -> str:
-    if language == "english":
+    if language.lower() == "english":
         style = "English"
+    elif language.lower() == "bangla":
+        style = "native Bangla script (বাংলা অক্ষর). CRITICAL: Write entirely in Bengali characters."
     else:
         style = ("Banglish (Bangla words written ONLY in English alphabet, e.g., "
                  "'Assalamualaikum, apnar message er jonno dhonnobad'). "
