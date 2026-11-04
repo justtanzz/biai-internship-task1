@@ -102,7 +102,7 @@
             <h4>AI Summary</h4>
             <div id="aiSummary" class="reply-box">Loading...</div>
             
-            <h4>Overdue (> 48 hours)</h4>
+            <h4 id="overdueHeading">Overdue (> 48 hours)</h4>
             <ul id="overdueList" style="font-size: 14px;">Loading...</ul>
             
             <br>
@@ -302,12 +302,18 @@
             if (!resOverdue.ok) throw new Error("Failed to load overdue leads.");
             const overdueData = await resOverdue.json();
             
+            // Update heading with the demo date from the server
+            if (overdueData.as_of) {
+                document.getElementById('overdueHeading').innerText = `Overdue as of ${overdueData.as_of}`;
+            }
+
             const list = document.getElementById('overdueList');
             list.innerHTML = '';
-            if (overdueData.length === 0) {
+            const leads = overdueData.overdue || [];
+            if (leads.length === 0) {
                 list.innerHTML = '<li>No overdue leads.</li>';
             } else {
-                overdueData.forEach(e => {
+                leads.forEach(e => {
                     list.innerHTML += `<li><strong>${e.name}</strong> - ${e.status} (Needs follow-up)</li>`;
                 });
             }
