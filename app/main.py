@@ -77,7 +77,7 @@ def reply(eid: int, s: Session = Depends(get_session)):
 @app.get("/reports/overdue")
 def get_overdue(s: Session = Depends(get_session)):
     # Configurable "now" for the demo data (Oct 26-27, 2026)
-    demo_now = datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc)
+    demo_now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
     cutoff = demo_now - timedelta(hours=48)
     
     overdue = s.exec(
