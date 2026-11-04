@@ -36,6 +36,7 @@ def run(path="data/sample-enquiries.csv", use_ai=True):
                 first = s.exec(select(Enquiry).where(Enquiry.phone == phone)).first()
                 if first:
                     e.duplicate_of = first.id
+                    e.status = "Duplicate"
             s.add(e)
             s.commit()
             s.refresh(e)

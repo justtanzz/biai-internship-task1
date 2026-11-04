@@ -38,6 +38,13 @@ def list_enquiries(s: Session = Depends(get_session)):
 
 @app.post("/enquiries")
 def create_enquiry(e: Enquiry, s: Session = Depends(get_session)):
+    # Check for existing phone number before saving
+    if e.phone:
+        first = s.exec(select(Enquiry).where(Enquiry.phone == e.phone)).first()
+        if first:
+            e.duplicate_of = first.id
+            e.status = "Duplicate"
+            
     s.add(e)
     s.commit()
     s.refresh(e)
