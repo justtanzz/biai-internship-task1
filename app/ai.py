@@ -44,7 +44,7 @@ Never invent information. Use "" when string is unknown."""
 
 def generate_summary(stats: str) -> str:
     system = """You are a helpful AI assistant for BIAI. 
-    Convert the provided CRM pipeline statistics into a brief, natural-sounding executive summary. The summary must be no more than 5 sentences.
+    Convert the provided CRM pipeline statistics into a brief, natural-sounding executive summary. The summary must be no more than 100 words.
     Keep it professional and highlight any urgent or overdue items."""
     
     r = client.chat.completions.create(
