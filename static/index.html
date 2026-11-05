@@ -145,16 +145,16 @@
             });
         }
 
+        let currentExtractedData = {}; // Stores all extracted AI fields
+
         async function extractData(btn) {
             const msg = document.getElementById('rawMessage').value;
             
-            // Fix 3: Stop empty requests before they hit the GPU
             if (!msg.trim()) {
                 alert("Please paste a message first.");
                 return;
             }
             
-            // Add a friendly loading state for extraction
             const originalText = btn.innerText;
             btn.innerText = "Extracting...";
             btn.disabled = true;
@@ -167,6 +167,9 @@
                     body: JSON.stringify({ message: msg, channel: 'Manual' })
                 });
                 const data = await res.json();
+                
+                // Cache the full extraction output
+                currentExtractedData = data;
                 
                 document.getElementById('fName').value = data.name || '';
                 document.getElementById('fPhone').value = data.phone || '';
@@ -184,13 +187,20 @@
                 phone: document.getElementById('fPhone').value,
                 interest: document.getElementById('fInterest').value,
                 message: document.getElementById('fMsg').value,
-                channel: "Manual"
+                channel: "Manual",
+                language: currentExtractedData.language || "english",
+                category: currentExtractedData.category || "lead",
+                company: currentExtractedData.company || null,
+                urgent: currentExtractedData.urgent || false,
+                summary: currentExtractedData.summary || ""
             };
             await fetch('/enquiries', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
             });
+            
+            currentExtractedData = {}; // Reset cache
             document.getElementById('newModal').style.display = 'none';
             document.getElementById('enquiryForm').reset();
             loadBoard();
