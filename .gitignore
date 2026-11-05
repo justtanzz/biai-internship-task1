@@ -1,0 +1,37 @@
+# Environment variables and credentials
+.env
+.env.*
+*.env
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+crm.db
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Testing and linters
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# IDE and OS artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
